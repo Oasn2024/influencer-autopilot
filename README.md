@@ -64,7 +64,7 @@ Open http://localhost:3000, sign up, and you will land on `/dashboard`.
 | `npm test` | Run unit tests |
 | `npm run lint` / `npm run typecheck` | Static checks |
 | `npm run db:generate` | Create a migration after editing `src/db/schema.ts` |
-| `npm run db:migrate` | Apply migrations to `DATABASE_URL` |
+| `npm run db:migrate` | Apply migrations to `DATABASE_URL` (also runs automatically on every Vercel deploy) |
 | `npm run tokens:rotate` | Re-encrypt stored tokens under the current key |
 
 ## Adding a platform

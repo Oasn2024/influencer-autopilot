@@ -10,9 +10,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "tsx scripts/migrate.ts",
     "db:studio": "drizzle-kit studio",
-    "tokens:rotate": "tsx scripts/rotate-token-keys.ts"
+    "tokens:rotate": "tsx scripts/rotate-token-keys.ts",
+    "vercel-build": "tsx scripts/migrate.ts && next build"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.10.4",
