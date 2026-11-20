@@ -33,7 +33,7 @@ const env = (k: string) => process.env[k] ?? "";
 const expiry = (seconds?: number) => (seconds ? new Date(Date.now() + seconds * 1000) : null);
 const qs = (params: Record<string, string>) => new URLSearchParams(params).toString();
 
-const X_SCOPES = ["tweet.read", "tweet.write", "users.read", "offline.access"];
+const X_SCOPES = ["tweet.read", "tweet.write", "users.read", "media.write", "offline.access"];
 const LINKEDIN_SCOPES = ["openid", "profile", "w_member_social"];
 const THREADS_SCOPES = ["threads_basic", "threads_content_publish", "threads_manage_insights"];
 const META_SCOPES = [

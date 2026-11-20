@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { upload } from "@vercel/blob/client";
+import { useRef, useState, useTransition } from "react";
 import { buttonClass, inputClass, PlatformChip, primaryButtonClass } from "@/components/ui";
 import { bestTimeLabel } from "@/lib/ai/best-times";
 import { scorePost } from "@/lib/ai/engagement";
@@ -22,7 +23,9 @@ type Account = {
 const length = (s: string) => [...s].length;
 type Tab = "write" | "repurpose" | "image";
 
-export function Composer({ accounts, timeZone, imagesOn }: { accounts: Account[]; timeZone: string; imagesOn: boolean }) {
+const UPLOAD_ACCEPT = "image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime";
+
+export function Composer({ accounts, timeZone, imagesOn, uploadPrefix }: { accounts: Account[]; timeZone: string; imagesOn: boolean; uploadPrefix: string }) {
   const router = useRouter();
   const [selected, setSelected] = useState<string[]>(accounts.map((a) => a.id));
   const [body, setBody] = useState("");
@@ -49,6 +52,25 @@ export function Composer({ accounts, timeZone, imagesOn }: { accounts: Account[]
   const [imageModel, setImageModel] = useState<string>(IMAGE_MODELS[0].id);
   const [imaging, startImage] = useTransition();
   const [focus, setFocus] = useState<string | null>(null);
+  const [uploading, setUploading] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  const uploadFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setError(null);
+    for (const file of Array.from(files)) {
+      try {
+        setUploading(file.name);
+        const safe = file.name.replace(/[^\w.-]+/g, "-").slice(-80) || "file";
+        const blob = await upload(`${uploadPrefix}${safe}`, file, { access: "public", handleUploadUrl: "/api/uploads", contentType: file.type });
+        setMedia((m) => [m.trim(), blob.url].filter(Boolean).join("\n"));
+      } catch (err) {
+        setError(`Couldn't upload ${file.name}: ${err instanceof Error ? err.message : "upload failed"}`);
+      }
+    }
+    setUploading(null);
+    if (fileInput.current) fileInput.current.value = "";
+  };
 
   const chosen = accounts.filter((a) => selected.includes(a.id));
   const platforms = [...new Set(chosen.map((a) => a.platform))];
@@ -150,12 +172,22 @@ export function Composer({ accounts, timeZone, imagesOn }: { accounts: Account[]
             value={body}
             onChange={(e) => setBody(e.target.value)}
           />
-          <label className="mt-2 text-sm font-semibold" htmlFor="media">Images or video</label>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <label className="text-sm font-semibold" htmlFor="media">Images or video</label>
+            {imagesOn && (
+              <>
+                <input ref={fileInput} type="file" multiple accept={UPLOAD_ACCEPT} className="sr-only" id="upload" onChange={(e) => uploadFiles(e.target.files)} />
+                <label htmlFor="upload" className={`${buttonClass} ml-auto cursor-pointer ${uploading ? "pointer-events-none opacity-50" : ""}`}>
+                  {uploading ? `Uploading ${uploading.slice(0, 24)}…` : "⬆ Upload from device"}
+                </label>
+              </>
+            )}
+          </div>
           <textarea
             id="media"
             rows={2}
             className={inputClass}
-            placeholder="https://… one public link per line. Instagram needs at least one. AI images are added here."
+            placeholder={imagesOn ? "Upload above, or paste public links (one per line). Instagram needs at least one." : "https://… one public link per line. Instagram needs at least one."}
             value={media}
             onChange={(e) => setMedia(e.target.value)}
           />
@@ -163,8 +195,12 @@ export function Composer({ accounts, timeZone, imagesOn }: { accounts: Account[]
             <div className="flex flex-wrap gap-2">
               {mediaUrls.map((u) => (
                 <div key={u} className="group relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={u} alt="" className="size-20 rounded-lg border border-border object-cover" />
+                  {/\.(mp4|mov|m4v|webm)(\?|$)/i.test(u) ? (
+                    <video src={u} muted className="size-20 rounded-lg border border-border object-cover" />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={u} alt="" className="size-20 rounded-lg border border-border object-cover" />
+                  )}
                   <button
                     type="button"
                     aria-label="Remove image"

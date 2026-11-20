@@ -8,17 +8,40 @@ const respond = (status: number, body: unknown) => async () => new Response(JSON
 afterEach(() => setFetch((...args) => fetch(...args)));
 
 describe("xPublisher", () => {
-  it("posts text with media links appended", async () => {
-    let sent: { url: string; body: unknown; auth: string | null } | null = null;
+  it("uploads images natively and keeps videos as links", async () => {
+    const calls: string[] = [];
+    let tweet: Record<string, unknown> | null = null;
+    let auth: string | null = null;
     setFetch(async (url, init) => {
-      sent = { url: String(url), body: JSON.parse(String(init?.body)), auth: new Headers(init?.headers).get("authorization") };
-      return new Response(JSON.stringify({ data: { id: "123" } }), { status: 201 });
+      const u = String(url);
+      calls.push(u);
+      if (u === "https://cdn.example.com/a.jpg") return new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "image/jpeg" } });
+      if (u.endsWith("/media/upload")) {
+        expect(init?.body).toBeInstanceOf(FormData);
+        return Response.json({ data: { id: "m1" } });
+      }
+      tweet = JSON.parse(String(init?.body));
+      auth = new Headers(init?.headers).get("authorization");
+      return Response.json({ data: { id: "123" } }, { status: 201 });
     });
-    const res = await xPublisher.publish(target, "tok", { text: "Hello", mediaUrls: ["https://cdn.example.com/a.jpg"] });
+    const res = await xPublisher.publish(target, "tok", { text: "Hello", mediaUrls: ["https://cdn.example.com/a.jpg", "https://cdn.example.com/v.mp4"] });
     expect(res).toEqual({ externalPostId: "123", url: "https://x.com/i/web/status/123" });
-    expect(sent!.url).toBe("https://api.x.com/2/tweets");
-    expect(sent!.body).toEqual({ text: "Hello\nhttps://cdn.example.com/a.jpg" });
-    expect(sent!.auth).toBe("Bearer tok");
+    expect(calls).toEqual(["https://cdn.example.com/a.jpg", "https://api.x.com/2/media/upload", "https://api.x.com/2/tweets"]);
+    expect(tweet).toEqual({ text: "Hello\nhttps://cdn.example.com/v.mp4", media: { media_ids: ["m1"] } });
+    expect(auth).toBe("Bearer tok");
+  });
+
+  it("falls back to a link when X refuses the image upload", async () => {
+    let tweet: Record<string, unknown> | null = null;
+    setFetch(async (url, init) => {
+      const u = String(url);
+      if (u.endsWith(".png")) return new Response(new Uint8Array([1]), { headers: { "content-type": "image/png" } });
+      if (u.endsWith("/media/upload")) return Response.json({ detail: "Forbidden: missing media.write" }, { status: 403 });
+      tweet = JSON.parse(String(init?.body));
+      return Response.json({ data: { id: "9" } });
+    });
+    await xPublisher.publish(target, "tok", { text: "Hi", mediaUrls: ["https://cdn.example.com/p.png"] }).catch(() => null);
+    expect(tweet).toEqual({ text: "Hi\nhttps://cdn.example.com/p.png" });
   });
 
   it("marks 401 as an auth error", async () => {
