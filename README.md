@@ -45,7 +45,39 @@ of the database alone cannot read any token.
 | `users` | One row per Clerk user, created on first sign-in |
 | `connected_accounts` | A linked social account with encrypted tokens, scopes and expiry |
 | `posts` | Content written once (text, media, optional AI generation info, schedule) |
-| `post_targets` | One row per post × account, so each platform succeeds or fails on its own |
+| `post_targets` | One row per post × account, so each platform succeeds or fails on its own (attempts, next retry, link to the live post) |
+| `autopilot_settings` | Per-user weekly posting times, time zone, accounts, brand voice, topics, approval mode |
+| `activity_events` | Monitoring log of everything the publisher and autopilot did |
+| `api_keys` | Personal developer API keys (only a SHA-256 hash is stored) |
+
+## How autopilot works
+
+A GitHub Actions schedule (`.github/workflows/autopilot-cron.yml`) calls `/api/cron/run` every 5 minutes, secured with `CRON_SECRET`; Vercel's Hobby plan only allows a daily cron, which stays in `vercel.json` as a backstop. On Vercel Pro you can move the 5-minute schedule into `vercel.json` instead. Each run:
+
+1. **Publishes what's due.** Due `post_targets` are claimed with `FOR UPDATE SKIP LOCKED`, so overlapping runs never double-post. Each target refreshes its token if it's about to expire, checks the platform's limits, then publishes. Rate limits and outages retry with backoff (1, 4, 16, 64 min); an expired token marks the account *expired* and shows a Reconnect button.
+2. **Fills empty slots.** For every user with autopilot on, AI drafts posts for free posting times in the next N days (3 per run), rotating through their topics in their brand voice, with a tailored version per platform. Drafts wait for approval unless the user turns approval off.
+
+Supported publishing today: X, LinkedIn, Threads, Facebook Pages and Instagram business accounts. X and LinkedIn post text (media links are appended); Instagram needs an image or video, so autopilot skips it and posts to it happen from Compose.
+
+## Developer API
+
+Create a key under **Dashboard → API**, then send `Authorization: Bearer iap_…`.
+
+| Method | Path | |
+| --- | --- | --- |
+| GET | `/api/v1/accounts` | Connected accounts |
+| GET | `/api/v1/posts?status=scheduled,failed&limit=50` | Posts with per-account results |
+| POST | `/api/v1/posts` | `{ body, media_urls?, account_ids, overrides?, scheduled_at?, draft? }` |
+| GET | `/api/v1/posts/{id}` | One post |
+| POST | `/api/v1/posts/{id}/publish` | Publish now |
+| DELETE | `/api/v1/posts/{id}` | Cancel |
+| POST | `/api/v1/drafts` | `{ topic, platforms, notes? }` → AI text per platform |
+
+## Platform app setup
+
+Each platform needs a developer app; put its keys in the env vars listed in `.env.example` and register this redirect URI:
+`https://<your app>/api/connect/<provider>/callback` with provider `x`, `linkedin`, `threads` or `meta`.
+The Accounts page shows "Needs app keys" until a platform's keys are set.
 
 ## Getting started
 
@@ -70,14 +102,13 @@ Open http://localhost:3000, sign up, and you will land on `/dashboard`.
 ## Adding a platform
 
 `src/lib/platforms/index.ts` lists every platform with its limits and
-developer portal. To add an integration: implement its OAuth routes under
-`src/app/api/connect/<platform>/`, call `upsertConnectedAccount()` with the
-tokens from the callback, then set `available: true` so the Connect button
-appears on the Accounts page.
+developer portal. To add an integration: add an OAuth provider in
+`src/lib/oauth/providers.ts`, a publisher in `src/lib/publishers/`, register it
+in `src/lib/publishers/index.ts`, then set `available: true`.
 
 ## Roadmap
 
-1. Platform integrations (Meta: Facebook, Instagram, Threads, WhatsApp; then X, YouTube, TikTok, Pinterest, LinkedIn)
-2. Post composer and scheduler (background job that publishes due `post_targets`)
-3. AI content generation and per-platform caption adaptation
-4. Mobile app sharing the same API
+1. More platforms: YouTube, TikTok, Pinterest, WhatsApp
+2. Native media upload for X and LinkedIn, and a media library
+3. Engagement metrics (likes, reach) pulled back into Monitor
+4. Mobile app on the same developer API

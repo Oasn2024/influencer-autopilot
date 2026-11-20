@@ -1,10 +1,12 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-// Everything under /dashboard and /api requires a signed-in user.
+// Dashboard and app API routes need a signed-in user. The developer API (/api/v1)
+// authenticates API keys itself, and the cron route checks CRON_SECRET.
 const isProtectedRoute = createRouteMatcher(["/dashboard(.*)", "/api(.*)"]);
+const isSelfAuthenticated = createRouteMatcher(["/api/v1(.*)", "/api/cron(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) await auth.protect();
+  if (isProtectedRoute(req) && !isSelfAuthenticated(req)) await auth.protect();
 });
 
 export const config = {

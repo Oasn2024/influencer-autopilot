@@ -90,3 +90,22 @@ export async function deleteConnectedAccount(userId: string, accountId: string):
     .returning({ id: connectedAccounts.id });
   return deleted.length > 0;
 }
+
+/** Store refreshed tokens (re-encrypted) after a platform token refresh. */
+export async function updateAccountTokens(
+  account: Pick<ConnectedAccount, "id" | "userId" | "platform" | "externalAccountId">,
+  tokens: PlainTokens & { expiresAt?: Date | null },
+) {
+  const sealed = sealTokens(account, tokens);
+  await getDb()
+    .update(connectedAccounts)
+    .set({ ...sealed, tokenExpiresAt: tokens.expiresAt ?? null, status: "active", lastError: null, updatedAt: sql`now()` })
+    .where(eq(connectedAccounts.id, account.id));
+}
+
+export async function setAccountStatus(accountId: string, status: ConnectedAccount["status"], lastError: string | null) {
+  await getDb()
+    .update(connectedAccounts)
+    .set({ status, lastError, updatedAt: sql`now()` })
+    .where(eq(connectedAccounts.id, accountId));
+}
