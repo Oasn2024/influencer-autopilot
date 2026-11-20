@@ -52,7 +52,7 @@ of the database alone cannot read any token.
 
 ## How autopilot works
 
-A Vercel Cron job calls `/api/cron/run` every 5 minutes (secured with `CRON_SECRET`). Each run:
+A GitHub Actions schedule (`.github/workflows/autopilot-cron.yml`) calls `/api/cron/run` every 5 minutes, secured with `CRON_SECRET`; Vercel's Hobby plan only allows a daily cron, which stays in `vercel.json` as a backstop. On Vercel Pro you can move the 5-minute schedule into `vercel.json` instead. Each run:
 
 1. **Publishes what's due.** Due `post_targets` are claimed with `FOR UPDATE SKIP LOCKED`, so overlapping runs never double-post. Each target refreshes its token if it's about to expire, checks the platform's limits, then publishes. Rate limits and outages retry with backoff (1, 4, 16, 64 min); an expired token marks the account *expired* and shows a Reconnect button.
 2. **Fills empty slots.** For every user with autopilot on, AI drafts posts for free posting times in the next N days (3 per run), rotating through their topics in their brand voice, with a tailored version per platform. Drafts wait for approval unless the user turns approval off.
