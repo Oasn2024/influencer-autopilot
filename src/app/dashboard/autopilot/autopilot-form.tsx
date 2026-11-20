@@ -93,7 +93,10 @@ export function AutopilotForm({ initial, accounts }: { initial: Settings; accoun
           <button type="button" className={buttonClass} onClick={addSlots} disabled={!newDays.length || !newTime}>Add time</button>
           <button type="button" className={buttonClass} onClick={useSuggested} disabled={!accounts.length}>✨ Use suggested times</button>
         </div>
-        <p className="text-xs text-muted">Suggested times are common peak hours for your selected platforms. Every audience differs, so check Monitor and adjust.</p>
+        <p className="text-xs text-muted">
+          Suggested times are common peak hours for your selected platforms. Once you have results,{" "}
+          <a href="/dashboard/analytics" className="text-accent underline">Analytics</a> learns your own best times.
+        </p>
         {s.slots.length === 0 ? (
           <p className="text-sm text-muted">No posting times yet.</p>
         ) : (

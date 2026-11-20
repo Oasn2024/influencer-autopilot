@@ -8,6 +8,7 @@ const links = [
   { href: "/dashboard/compose", label: "Create", icon: "✦" },
   { href: "/dashboard/calendar", label: "Calendar", icon: "▦" },
   { href: "/dashboard/posts", label: "Posts", icon: "☰" },
+  { href: "/dashboard/analytics", label: "Analytics", icon: "▲" },
   { href: "/dashboard/autopilot", label: "Autopilot", icon: "⟳" },
   { href: "/dashboard/monitor", label: "Monitor", icon: "◉" },
   { href: "/dashboard/accounts", label: "Accounts", icon: "⚭" },

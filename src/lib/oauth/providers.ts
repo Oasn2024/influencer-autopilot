@@ -35,13 +35,14 @@ const qs = (params: Record<string, string>) => new URLSearchParams(params).toStr
 
 const X_SCOPES = ["tweet.read", "tweet.write", "users.read", "offline.access"];
 const LINKEDIN_SCOPES = ["openid", "profile", "w_member_social"];
-const THREADS_SCOPES = ["threads_basic", "threads_content_publish"];
+const THREADS_SCOPES = ["threads_basic", "threads_content_publish", "threads_manage_insights"];
 const META_SCOPES = [
   "pages_show_list",
   "pages_read_engagement",
   "pages_manage_posts",
   "instagram_basic",
   "instagram_content_publish",
+  "instagram_manage_insights",
   "business_management",
 ];
 

@@ -80,6 +80,9 @@ export const posts = pgTable(
 );
 
 /** One row per (post, account): lets each platform succeed or fail independently. */
+/** Engagement counts for one published post on one platform. Missing fields weren't available. */
+export type TargetMetrics = { likes?: number; comments?: number; shares?: number; views?: number; error?: string };
+
 export const postTargets = pgTable(
   "post_targets",
   {
@@ -96,12 +99,16 @@ export const postTargets = pgTable(
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
     lastError: text("last_error"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
+    /** Latest engagement numbers read back from the platform. */
+    metrics: jsonb("metrics").$type<TargetMetrics>(),
+    metricsUpdatedAt: timestamp("metrics_updated_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     uniqueIndex("post_targets_post_account_idx").on(t.postId, t.connectedAccountId),
     index("post_targets_retry_idx").on(t.status, t.nextAttemptAt),
+    index("post_targets_published_idx").on(t.status, t.publishedAt),
   ],
 );
 

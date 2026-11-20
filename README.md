@@ -71,6 +71,20 @@ The composer has an AI Studio built on the Vercel AI Gateway, so one setup cover
 
 Only models in `src/lib/ai/models.ts` can be used. Each user gets 60 AI writes and 20 AI images per rolling 24 hours (`DAILY_LIMITS` in `src/lib/ai/studio.ts`), so a leaked API key can't run up the AI bill.
 
+## Analytics
+
+Every cron run reads engagement back for posts published in the last 30 days: every 3 hours while a post is under 2 days old, then daily (`src/lib/analytics`). The Analytics page shows totals, a per-platform breakdown, top posts, and **your best times**. Each post is compared with the typical post on the same account, so a big audience on one platform doesn't drown out the others. Once there are 8+ posts with stats, one click copies the best times into autopilot.
+
+| Platform | What's read | Permission |
+| --- | --- | --- |
+| X | likes, replies, reposts + quotes, impressions | `tweet.read` (needs an X API plan that allows reads) |
+| Threads | views, likes, replies, reposts + quotes | `threads_manage_insights` |
+| Facebook Page | reactions, comments, shares | `pages_read_engagement` |
+| Instagram | likes, comments (+ views, shares with insights) | `instagram_basic`, `instagram_manage_insights` |
+| LinkedIn | not available: LinkedIn restricts reading member post stats to approved partners | |
+
+Accounts connected before this release need reconnecting once for the new Threads and Instagram insights permissions. A failed stats read never disconnects an account; it keeps the last numbers and shows the reason on the Analytics page.
+
 ## Developer API
 
 Create a key under **Dashboard → API**, then send `Authorization: Bearer iap_…`.
