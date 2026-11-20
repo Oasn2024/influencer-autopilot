@@ -25,6 +25,7 @@ export async function getPostStats(userId: string) {
     scheduled: (by.scheduled ?? 0) + (by.publishing ?? 0),
     pendingApproval: by.pending_approval ?? 0,
     drafts: by.draft ?? 0,
+    total: rows.reduce((n, r) => n + r.n, 0),
     publishedWeek: week?.published ?? 0,
     failedWeek: week?.failed ?? 0,
   };

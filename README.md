@@ -59,6 +59,10 @@ A GitHub Actions schedule (`.github/workflows/autopilot-cron.yml`) calls `/api/c
 
 Supported publishing today: X, LinkedIn, Threads, Facebook Pages and Instagram business accounts. X and LinkedIn post text (media links are appended); Instagram needs an image or video, so autopilot skips it and posts to it happen from Compose.
 
+## Media uploads
+
+With a Vercel Blob store connected, creators upload photos and videos straight from their device ("Upload from device" in the composer). The browser uploads directly to Blob with a short-lived token from `/api/uploads`, limited to the signed-in user's own folder, image/video types and 200 MB. On X, images (up to 4, 5 MB each) are uploaded natively so they show as photos. Videos, and images X won't take, are added as links. This needs the `media.write` scope, so older X connections should reconnect once.
+
 ## AI Studio
 
 The composer has an AI Studio built on the Vercel AI Gateway, so one setup covers every vendor:

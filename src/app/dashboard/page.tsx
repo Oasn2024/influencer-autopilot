@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { buttonClass, primaryButtonClass, StatCard } from "@/components/ui";
+import { setupSteps } from "@/lib/onboarding";
 import { PLATFORMS, type PlatformId } from "@/lib/platforms";
 import { getAutopilotSettings } from "@/lib/autopilot/runner";
 import { listConnectedAccounts } from "@/lib/connected-accounts";
@@ -22,6 +23,15 @@ export default async function DashboardPage() {
     listPosts(userId, { statuses: ["failed", "partial"], from: daysAgo(7), limit: 3 }),
   ]);
   const unhealthy = accounts.filter((a) => a.status !== "active");
+  const steps = setupSteps({
+    accounts: accounts.length,
+    brandVoice: settings.brandVoice,
+    posts: stats.total,
+    slots: settings.slots.length,
+    autopilotOn: settings.enabled,
+  });
+  const doneCount = steps.filter((s) => s.done).length;
+  const next = steps.find((s) => !s.done);
   const stuck = problems.flatMap((p) => p.targets.filter((t) => t.status === "failed").map((t) => ({ post: p, target: t })));
 
   return (
@@ -34,6 +44,34 @@ export default async function DashboardPage() {
         <Link href="/dashboard/calendar" className={`ml-auto ${buttonClass}`}>Calendar</Link>
         <Link href="/dashboard/compose" className={primaryButtonClass}>✦ Create with AI</Link>
       </div>
+
+      {next && (
+        <section className="overflow-hidden rounded-2xl border border-accent/40 bg-card">
+          <div className="bg-gradient-to-br from-accent/15 via-accent-2/10 to-transparent p-5">
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="font-semibold">Get set up</h2>
+              <span className="text-sm text-muted">{doneCount} of {steps.length} done</span>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-border sm:ml-auto sm:w-48">
+                <div className="bg-brand h-full rounded-full" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
+              </div>
+            </div>
+            <ol className="mt-4 flex flex-col gap-2">
+              {steps.map((st, i) => (
+                <li key={st.id} className={`flex items-center gap-3 rounded-xl p-2.5 ${st === next ? "bg-background ring-1 ring-border" : ""}`}>
+                  <span className={`grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold ${st.done ? "bg-green-600 text-white" : st === next ? "bg-brand text-white" : "border border-border text-muted"}`}>
+                    {st.done ? "✓" : i + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-medium ${st.done ? "text-muted line-through" : ""}`}>{st.title}</p>
+                    {st === next && <p className="text-xs text-muted">{st.detail}</p>}
+                  </div>
+                  {st === next && <Link href={st.href} className={primaryButtonClass}>{st.cta}</Link>}
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+      )}
 
       {stuck.length > 0 && (
         <div role="alert" className="rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm">

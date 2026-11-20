@@ -53,6 +53,9 @@ export function setFetch(f: FetchLike) {
   fetchImpl = f;
 }
 
+/** Raw request through the swappable client (for downloading media). */
+export const fetchRaw: FetchLike = (...args) => fetchImpl(...args);
+
 /** JSON request that turns platform errors into PublishErrors with the right retry semantics. */
 export async function requestJson<T = Record<string, unknown>>(
   url: string,

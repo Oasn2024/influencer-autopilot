@@ -24,6 +24,7 @@ export default async function ComposePage() {
         <Composer
           timeZone={settings.timezone}
           imagesOn={imagesEnabled()}
+          uploadPrefix={`uploads/${userId}/`}
           accounts={active.map((a) => ({
             id: a.id,
             platform: a.platform,
