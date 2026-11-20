@@ -5,6 +5,7 @@ import { getAutopilotSettings } from "@/lib/autopilot/runner";
 import { listConnectedAccounts } from "@/lib/connected-accounts";
 import { PLATFORMS } from "@/lib/platforms";
 import { requireUserId } from "@/lib/users";
+import { imagesEnabled } from "@/lib/ai/images";
 import { Composer } from "./composer";
 
 export default async function ComposePage() {
@@ -14,7 +15,7 @@ export default async function ComposePage() {
   const active = accounts.filter((a) => a.status === "active");
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Compose">Write once, tailor per platform, then publish now or schedule it.</PageHeader>
+      <PageHeader title="Compose">Write once with AI, tailor it per platform, then publish now or schedule it.</PageHeader>
       {active.length === 0 ? (
         <p className="text-sm text-muted">
           <Link href="/dashboard/accounts" className="text-accent underline">Connect an account</Link> to start posting.
@@ -22,11 +23,13 @@ export default async function ComposePage() {
       ) : (
         <Composer
           timeZone={settings.timezone}
+          imagesOn={imagesEnabled()}
           accounts={active.map((a) => ({
             id: a.id,
             platform: a.platform,
             name: a.displayName ?? a.handle ?? a.externalAccountId,
             platformName: PLATFORMS[a.platform].name,
+            color: PLATFORMS[a.platform].color,
             maxLength: PLATFORMS[a.platform].maxTextLength ?? null,
             needsMedia: !PLATFORMS[a.platform].supports.includes("text"),
           }))}

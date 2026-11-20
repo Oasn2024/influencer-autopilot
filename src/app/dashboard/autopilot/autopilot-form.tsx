@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { buttonClass, inputClass, primaryButtonClass } from "@/components/ui";
 import type { AutopilotSlot } from "@/db/schema";
+import { suggestedSlots } from "@/lib/ai/best-times";
+import type { PlatformId } from "@/lib/platforms";
 import { runAutopilotNowAction, saveAutopilotAction } from "../actions";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -19,7 +21,7 @@ type Settings = {
   horizonDays: number;
 };
 
-type Account = { id: string; label: string; textCapable: boolean; active: boolean };
+type Account = { id: string; label: string; platform: PlatformId; textCapable: boolean; active: boolean };
 
 export function AutopilotForm({ initial, accounts }: { initial: Settings; accounts: Account[] }) {
   const router = useRouter();
@@ -34,6 +36,11 @@ export function AutopilotForm({ initial, accounts }: { initial: Settings; accoun
   const addSlots = () => {
     const add = newDays.map((day) => ({ day, time: newTime })).filter((n) => !s.slots.some((x) => x.day === n.day && x.time === n.time));
     set("slots", [...s.slots, ...add].sort((a, b) => a.day - b.day || a.time.localeCompare(b.time)));
+  };
+
+  const useSuggested = () => {
+    const picked = accounts.filter((a) => s.accountIds.includes(a.id) && a.textCapable);
+    set("slots", suggestedSlots((picked.length ? picked : accounts).map((a) => a.platform)));
   };
 
   const save = () =>
@@ -84,7 +91,9 @@ export function AutopilotForm({ initial, accounts }: { initial: Settings; accoun
           ))}
           <input type="time" className={`${inputClass} w-32`} value={newTime} onChange={(e) => setNewTime(e.target.value)} />
           <button type="button" className={buttonClass} onClick={addSlots} disabled={!newDays.length || !newTime}>Add time</button>
+          <button type="button" className={buttonClass} onClick={useSuggested} disabled={!accounts.length}>✨ Use suggested times</button>
         </div>
+        <p className="text-xs text-muted">Suggested times are common peak hours for your selected platforms. Every audience differs, so check Monitor and adjust.</p>
         {s.slots.length === 0 ? (
           <p className="text-sm text-muted">No posting times yet.</p>
         ) : (

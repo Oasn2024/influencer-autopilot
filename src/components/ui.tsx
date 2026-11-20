@@ -28,9 +28,9 @@ export function Badge({ status }: { status: string }) {
 
 export function StatCard({ title, value, href, note }: { title: string; value: string | number; href?: string; note?: string }) {
   const body = (
-    <div className="h-full rounded-xl border border-border bg-card p-4">
+    <div className="h-full rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:border-accent/50">
       <p className="text-sm text-muted">{title}</p>
-      <p className="mt-1 text-3xl font-semibold">{value}</p>
+      <p className="mt-1 text-3xl font-semibold tabular-nums">{value}</p>
       {note && <p className="mt-1 text-xs text-muted">{note}</p>}
     </div>
   );
@@ -40,7 +40,7 @@ export function StatCard({ title, value, href, note }: { title: string; value: s
 export function PageHeader({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
     <div>
-      <h1 className="text-2xl font-bold">{title}</h1>
+      <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
       {children && <p className="mt-1 text-sm text-muted">{children}</p>}
     </div>
   );
@@ -51,6 +51,17 @@ export function formatWhen(d: Date | string | null | undefined, timeZone?: strin
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone }).format(new Date(d));
 }
 
-export const buttonClass = "rounded-md border border-border px-3 py-1 text-sm hover:bg-card disabled:opacity-50";
-export const primaryButtonClass = "rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50";
-export const inputClass = "w-full rounded-md border border-border bg-background px-3 py-2 text-sm";
+export const buttonClass = "rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium hover:border-accent/50 disabled:opacity-50";
+export const primaryButtonClass = "bg-brand rounded-lg px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 disabled:opacity-50";
+export const inputClass = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-accent focus:outline-none";
+
+/** A small brand-colored dot + platform name. */
+export function PlatformChip({ name, color, detail, className = "" }: { name: string; color: string; detail?: string; className?: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-0.5 text-xs font-medium ${className}`}>
+      <span aria-hidden className="size-2 rounded-full" style={{ background: color }} />
+      {name}
+      {detail && <span className="font-normal text-muted">{detail}</span>}
+    </span>
+  );
+}

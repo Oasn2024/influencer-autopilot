@@ -30,6 +30,7 @@ export default async function AutopilotPage() {
         accounts={accounts.map((a) => ({
           id: a.id,
           label: `${PLATFORMS[a.platform].name} · ${a.displayName ?? a.handle ?? a.externalAccountId}`,
+          platform: a.platform,
           textCapable: PLATFORMS[a.platform].supports.includes("text"),
           active: a.status === "active",
         }))}
