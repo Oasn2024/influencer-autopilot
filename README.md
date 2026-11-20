@@ -59,6 +59,18 @@ A GitHub Actions schedule (`.github/workflows/autopilot-cron.yml`) calls `/api/c
 
 Supported publishing today: X, LinkedIn, Threads, Facebook Pages and Instagram business accounts. X and LinkedIn post text (media links are appended); Instagram needs an image or video, so autopilot skips it and posts to it happen from Compose.
 
+## AI Studio
+
+The composer has an AI Studio built on the Vercel AI Gateway, so one setup covers every vendor:
+
+- **Write**: pick Claude, GPT or Gemini, a goal and a tone, and get up to 3 options with different angles. Each has a hook, hashtags, an image idea and a version for each selected platform.
+- **Repurpose**: paste a blog post, transcript or newsletter and get platform-ready posts from its best idea.
+- **Image**: GPT Image or FLUX generate an image in feed, portrait, story or wide shape. It's saved to Vercel Blob and added to the post's media.
+- **Engagement check**: a live score with plain tips (hook, call to action, length and hashtags per platform, media, links on Instagram). It's a heuristic, not a prediction.
+- **Suggested times**: common peak hours per platform, shown in the composer and offered as one-click autopilot slots.
+
+Only models in `src/lib/ai/models.ts` can be used. Each user gets 60 AI writes and 20 AI images per rolling 24 hours (`DAILY_LIMITS` in `src/lib/ai/studio.ts`), so a leaked API key can't run up the AI bill.
+
 ## Developer API
 
 Create a key under **Dashboard → API**, then send `Authorization: Bearer iap_…`.
@@ -71,7 +83,8 @@ Create a key under **Dashboard → API**, then send `Authorization: Bearer iap_�
 | GET | `/api/v1/posts/{id}` | One post |
 | POST | `/api/v1/posts/{id}/publish` | Publish now |
 | DELETE | `/api/v1/posts/{id}` | Cancel |
-| POST | `/api/v1/drafts` | `{ topic, platforms, notes? }` → AI text per platform |
+| POST | `/api/v1/drafts` | `{ topic, platforms, notes?, model?, tone?, goal?, count? (1-3), source_text? }` → `data` (first option) and `options` |
+| POST | `/api/v1/images` | `{ prompt, aspect? ("1:1", "4:5", "9:16", "16:9"), model? }` → `{ url, model }` (needs a Blob store) |
 
 ## Platform app setup
 

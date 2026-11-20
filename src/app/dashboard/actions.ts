@@ -3,14 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { generateDraft, type Draft } from "@/lib/ai/drafts";
+import type { Draft } from "@/lib/ai/drafts";
+import { makeImage, StudioError, writeDrafts, type draftInputSchema, type imageInputSchema } from "@/lib/ai/studio";
 import { createApiKey, revokeApiKey } from "@/lib/api-keys";
 import { getAutopilotSettings, runAutopilotForUser, saveAutopilotSettings } from "@/lib/autopilot/runner";
 import { isValidTimeZone, parseSlotTime } from "@/lib/autopilot/time";
 import { listConnectedAccounts } from "@/lib/connected-accounts";
 import { publishPostNow } from "@/lib/publishing/engine";
 import { cancelPost, createPost, PostValidationError, retryTarget, schedulePost } from "@/lib/publishing/posts";
-import { PLATFORM_IDS, type PlatformId } from "@/lib/platforms";
 import { requireUserId } from "@/lib/users";
 
 async function userIdOrRedirect() {
@@ -19,20 +19,32 @@ async function userIdOrRedirect() {
   return userId;
 }
 
+type DraftInput = z.input<typeof draftInputSchema>;
+type ImageInput = z.input<typeof imageInputSchema>;
+
 export type ActionResult<T = undefined> = { ok: true; data?: T } | { ok: false; error: string };
 
-export async function draftWithAi(input: { topic: string; notes?: string; platforms: string[] }): Promise<ActionResult<Draft>> {
+export type DraftOption = Draft & { angle: string };
+
+export async function draftWithAi(input: DraftInput): Promise<ActionResult<DraftOption[]>> {
   const userId = await userIdOrRedirect();
-  const platforms = input.platforms.filter((p): p is PlatformId => (PLATFORM_IDS as readonly string[]).includes(p));
-  if (!input.topic.trim()) return { ok: false, error: "Tell the AI what the post is about" };
-  if (!platforms.length) return { ok: false, error: "Pick at least one account first" };
   try {
-    const settings = await getAutopilotSettings(userId);
-    const draft = await generateDraft({ topic: input.topic.slice(0, 500), notes: input.notes?.slice(0, 1000), platforms, brandVoice: settings.brandVoice });
-    return { ok: true, data: draft };
+    return { ok: true, data: await writeDrafts(userId, input) };
   } catch (err) {
+    if (err instanceof StudioError) return { ok: false, error: err.message };
     console.error("draft failed", err);
-    return { ok: false, error: "The AI writer isn't available right now. Check the AI Gateway setup, or write the post yourself." };
+    return { ok: false, error: "The AI writer isn't available right now. Try another model, or write the post yourself." };
+  }
+}
+
+export async function generateImageAction(input: ImageInput): Promise<ActionResult<{ url: string; model: string }>> {
+  const userId = await userIdOrRedirect();
+  try {
+    return { ok: true, data: await makeImage(userId, input) };
+  } catch (err) {
+    if (err instanceof StudioError) return { ok: false, error: err.message };
+    console.error("image failed", err);
+    return { ok: false, error: "The image generator isn't available right now. Try the other image model." };
   }
 }
 

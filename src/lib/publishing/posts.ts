@@ -87,11 +87,15 @@ export async function getPost(userId: string, postId: string): Promise<PostWithT
   return { ...post, targets: targets.map((t) => ({ ...t.target, platform: t.platform, accountName: t.accountName })) };
 }
 
-export async function listPosts(userId: string, opts: { statuses?: Post["status"][]; limit?: number } = {}) {
+export async function listPosts(userId: string, opts: { statuses?: Post["status"][]; limit?: number; from?: Date; to?: Date } = {}) {
   const db = getDb();
-  const where = opts.statuses?.length
-    ? and(eq(posts.userId, userId), inArray(posts.status, opts.statuses))
-    : eq(posts.userId, userId);
+  const when = sql`coalesce(${posts.publishedAt}, ${posts.scheduledAt})`;
+  const where = and(
+    eq(posts.userId, userId),
+    opts.statuses?.length ? inArray(posts.status, opts.statuses) : undefined,
+    opts.from ? sql`${when} >= ${opts.from.toISOString()}::timestamptz` : undefined,
+    opts.to ? sql`${when} < ${opts.to.toISOString()}::timestamptz` : undefined,
+  );
   const rows = await db
     .select()
     .from(posts)

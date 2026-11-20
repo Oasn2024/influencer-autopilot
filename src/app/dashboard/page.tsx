@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { StatCard } from "@/components/ui";
+import { buttonClass, primaryButtonClass, StatCard } from "@/components/ui";
+import { PLATFORMS, type PlatformId } from "@/lib/platforms";
 import { getAutopilotSettings } from "@/lib/autopilot/runner";
 import { listConnectedAccounts } from "@/lib/connected-accounts";
 import { listPosts } from "@/lib/publishing/posts";
@@ -8,23 +9,47 @@ import { getPostStats } from "@/lib/publishing/stats";
 import { requireUserId } from "@/lib/users";
 import { PostList } from "./post-list";
 
+const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
+
 export default async function DashboardPage() {
   const userId = await requireUserId();
   if (!userId) redirect("/sign-in");
-  const [accounts, stats, settings, upcoming] = await Promise.all([
+  const [accounts, stats, settings, upcoming, problems] = await Promise.all([
     listConnectedAccounts(userId),
     getPostStats(userId),
     getAutopilotSettings(userId),
     listPosts(userId, { statuses: ["pending_approval", "scheduled", "publishing"], limit: 5 }),
+    listPosts(userId, { statuses: ["failed", "partial"], from: daysAgo(7), limit: 3 }),
   ]);
   const unhealthy = accounts.filter((a) => a.status !== "active");
+  const stuck = problems.flatMap((p) => p.targets.filter((t) => t.status === "failed").map((t) => ({ post: p, target: t })));
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold">Welcome back</h1>
-        <Link href="/dashboard/compose" className="ml-auto rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white">New post</Link>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
+          <p className="text-sm text-muted">Here&apos;s what&apos;s going out and what needs you.</p>
+        </div>
+        <Link href="/dashboard/calendar" className={`ml-auto ${buttonClass}`}>Calendar</Link>
+        <Link href="/dashboard/compose" className={primaryButtonClass}>✦ Create with AI</Link>
       </div>
+
+      {stuck.length > 0 && (
+        <div role="alert" className="rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm">
+          <p className="font-semibold">{stuck.length} post{stuck.length > 1 ? "s" : ""} didn&apos;t go out this week</p>
+          <ul className="mt-2 flex flex-col gap-1">
+            {stuck.slice(0, 3).map(({ post, target }) => (
+              <li key={target.id} className="flex flex-wrap gap-x-2">
+                <span className="font-medium">{PLATFORMS[target.platform as PlatformId]?.name ?? target.platform}:</span>
+                <span className="text-muted">{target.lastError ?? "Unknown error"}</span>
+                <span className="truncate text-muted">“{post.body.slice(0, 60)}{post.body.length > 60 ? "…" : ""}”</span>
+              </li>
+            ))}
+          </ul>
+          <Link href="/dashboard/posts?tab=failed" className="mt-2 inline-block font-medium underline">Review and retry</Link>
+        </div>
+      )}
 
       {unhealthy.length > 0 && (
         <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
@@ -40,7 +65,7 @@ export default async function DashboardPage() {
         <StatCard title="Failed (7 days)" value={stats.failedWeek} href="/dashboard/posts?tab=failed" />
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-4 text-sm">
+      <div className="rounded-2xl border border-border bg-card p-4 text-sm">
         <span className="font-medium">Autopilot is {settings.enabled ? "on" : "off"}.</span>{" "}
         {settings.enabled
           ? `${settings.slots.length} posting time(s) a week, ${settings.requireApproval ? "drafts wait for your approval" : "drafts are scheduled automatically"}.`
