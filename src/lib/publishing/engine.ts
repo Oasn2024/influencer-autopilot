@@ -5,6 +5,7 @@ import { connectedAccounts, posts, postTargets, type ConnectedAccount} from "@/d
 import { openTokens } from "@/lib/connected-accounts/sealing";
 import { setAccountStatus, updateAccountTokens } from "@/lib/connected-accounts";
 import { getPublisher, PublishError } from "@/lib/publishers";
+import type { Publisher } from "@/lib/publishers/types";
 import { retryDelayMs, rollupPostStatus } from "@/lib/publishers/status";
 import { captionFor, validateForPlatform } from "@/lib/publishers/validation";
 import { PLATFORMS } from "@/lib/platforms";
@@ -44,6 +45,19 @@ function needsRefresh(account: ConnectedAccount): boolean {
   // Threads long-lived tokens last 60 days and can only be refreshed, not re-issued, so refresh early.
   const windowMs = account.platform === "threads" ? 7 * 24 * 3600_000 : 5 * 60_000;
   return account.tokenExpiresAt.getTime() - Date.now() < windowMs;
+}
+
+/** Decrypts the account's token, refreshing it first when it's about to expire. */
+export async function freshAccessToken(account: ConnectedAccount, publisher: Publisher): Promise<string> {
+  let tokens = openTokens(account, account);
+  if (publisher.refresh && needsRefresh(account)) {
+    const fresh = await publisher.refresh(tokens);
+    const refreshToken = fresh.refreshToken ?? tokens.refreshToken;
+    await updateAccountTokens(account, { accessToken: fresh.accessToken, refreshToken, expiresAt: fresh.expiresAt ?? null });
+    tokens = { accessToken: fresh.accessToken, refreshToken: refreshToken ?? "" };
+    await logEvent({ userId: account.userId, connectedAccountId: account.id, type: "account.refreshed", message: `${PLATFORMS[account.platform].name} token refreshed` });
+  }
+  return tokens.accessToken;
 }
 
 type TargetOutcome = { targetId: string; postId: string; status: "published" | "failed"; error?: string };
@@ -94,17 +108,10 @@ async function publishTarget(targetId: string): Promise<TargetOutcome | null> {
   if (issues.length) return fail(issues.map((i) => i.message).join("; "), { retryable: false });
 
   try {
-    let tokens = openTokens(account, account);
-    if (publisher.refresh && needsRefresh(account)) {
-      const fresh = await publisher.refresh(tokens);
-      const refreshToken = fresh.refreshToken ?? tokens.refreshToken;
-      await updateAccountTokens(account, { accessToken: fresh.accessToken, refreshToken, expiresAt: fresh.expiresAt ?? null });
-      tokens = { accessToken: fresh.accessToken, refreshToken: refreshToken ?? "" };
-      await logEvent({ ...base, type: "account.refreshed", message: `${platformName} token refreshed` });
-    }
+    const accessToken = await freshAccessToken(account, publisher);
     const result = await publisher.publish(
       { externalAccountId: account.externalAccountId, handle: account.handle, metadata: account.metadata },
-      tokens.accessToken,
+      accessToken,
       content,
     );
     await db

@@ -25,6 +25,12 @@ export function PostList({ posts, timeZone, empty }: { posts: PostWithTargets[];
                 {t.externalPostUrl && (
                   <a href={t.externalPostUrl} target="_blank" rel="noreferrer" className="text-accent underline">View</a>
                 )}
+                {t.metrics && !t.metrics.error && (
+                  <span className="text-xs tabular-nums text-muted" title="Likes · comments · shares">
+                    ♥ {t.metrics.likes ?? 0} · 💬 {t.metrics.comments ?? 0} · ↻ {t.metrics.shares ?? 0}
+                    {t.metrics.views ? ` · ${t.metrics.views} views` : ""}
+                  </span>
+                )}
                 {t.status === "failed" && t.nextAttemptAt && <span className="text-xs text-muted">retrying {formatWhen(t.nextAttemptAt, timeZone)}</span>}
                 {t.status === "failed" && !t.nextAttemptAt && (
                   <form action={retryTargetAction}>

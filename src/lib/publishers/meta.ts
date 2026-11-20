@@ -1,5 +1,5 @@
 import { isVideoUrl } from "./validation";
-import { PublishError, requestJson, sleep, type Publisher } from "./types";
+import { cleanMetrics, PublishError, requestJson, sleep, type Publisher } from "./types";
 
 export const graphVersion = () => process.env.META_GRAPH_VERSION ?? "v23.0";
 const fb = (path: string) => `https://graph.facebook.com/${graphVersion()}${path}`;
@@ -25,8 +25,28 @@ async function waitForContainer(statusUrl: string, field: "status_code" | "statu
   throw new PublishError(`${platformName} is still processing the media`, { retryable: true });
 }
 
+/** Reads Graph-style insights: [{ name, values: [{ value }] }] or [{ name, total_value: { value } }]. */
+export function readInsights(data: { data?: { name: string; values?: { value: number }[]; total_value?: { value: number } }[] }) {
+  const out: Record<string, number> = {};
+  for (const m of data.data ?? []) {
+    const v = m.total_value?.value ?? m.values?.[0]?.value;
+    if (typeof v === "number") out[m.name] = v;
+  }
+  return out;
+}
+
 export const facebookPublisher: Publisher = {
   platform: "facebook",
+  async metrics(_target, pageToken, id) {
+    type R = { reactions?: { summary?: { total_count?: number } }; comments?: { summary?: { total_count?: number } }; shares?: { count?: number } };
+    const fields = "reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0),shares";
+    const { data } = await requestJson<R>(fb(`/${id}?fields=${encodeURIComponent(fields)}&access_token=${pageToken}`), { platformName: "Facebook" });
+    return cleanMetrics({
+      likes: data.reactions?.summary?.total_count,
+      comments: data.comments?.summary?.total_count,
+      shares: data.shares?.count ?? 0,
+    });
+  },
   async publish(target, pageToken, content) {
     const pageId = target.externalAccountId;
     const [first] = content.mediaUrls;
@@ -60,6 +80,19 @@ export const facebookPublisher: Publisher = {
 
 export const instagramPublisher: Publisher = {
   platform: "instagram",
+  async metrics(_target, pageToken, id) {
+    const { data } = await requestJson<{ like_count?: number; comments_count?: number }>(
+      fb(`/${id}?fields=like_count,comments_count&access_token=${pageToken}`),
+      { platformName: "Instagram" },
+    );
+    // Views and shares need the insights permission; older connections may not have it.
+    const insights = await requestJson<Parameters<typeof readInsights>[0]>(fb(`/${id}/insights?metric=views,shares&access_token=${pageToken}`), {
+      platformName: "Instagram",
+    })
+      .then((r) => readInsights(r.data))
+      .catch(() => ({}) as Record<string, number>);
+    return cleanMetrics({ likes: data.like_count, comments: data.comments_count, shares: insights.shares, views: insights.views });
+  },
   async publish(target, pageToken, content) {
     const igId = target.externalAccountId;
     const createItem = async (url: string, extra: Record<string, string | undefined>) => {
@@ -105,6 +138,19 @@ export const instagramPublisher: Publisher = {
 
 export const threadsPublisher: Publisher = {
   platform: "threads",
+  async metrics(_target, accessToken, id) {
+    const { data } = await requestJson<Parameters<typeof readInsights>[0]>(
+      threads(`/${id}/insights?metric=views,likes,replies,reposts,quotes&access_token=${accessToken}`),
+      { platformName: "Threads" },
+    );
+    const m = readInsights(data);
+    return cleanMetrics({
+      likes: m.likes,
+      comments: m.replies,
+      shares: m.reposts === undefined && m.quotes === undefined ? undefined : (m.reposts ?? 0) + (m.quotes ?? 0),
+      views: m.views,
+    });
+  },
   async publish(target, accessToken, content) {
     const userId = target.externalAccountId;
     const [first] = content.mediaUrls;

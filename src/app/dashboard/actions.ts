@@ -6,6 +6,8 @@ import { z } from "zod";
 import type { Draft } from "@/lib/ai/drafts";
 import { makeImage, StudioError, writeDrafts, type draftInputSchema, type imageInputSchema } from "@/lib/ai/studio";
 import { createApiKey, revokeApiKey } from "@/lib/api-keys";
+import { listMetricRows, refreshMetrics } from "@/lib/analytics";
+import { learnBestTimes, toSlots } from "@/lib/analytics/insights";
 import { getAutopilotSettings, runAutopilotForUser, saveAutopilotSettings } from "@/lib/autopilot/runner";
 import { isValidTimeZone, parseSlotTime } from "@/lib/autopilot/time";
 import { listConnectedAccounts } from "@/lib/connected-accounts";
@@ -164,4 +166,24 @@ export async function revokeApiKeyAction(form: FormData) {
   const id = idFrom(form);
   if (id) await revokeApiKey(userId, id);
   revalidatePath("/dashboard/developers");
+}
+
+export async function refreshStatsAction(): Promise<ActionResult<{ updated: number }>> {
+  const userId = await userIdOrRedirect();
+  const r = await refreshMetrics({ userId, limit: 30 });
+  revalidatePath("/dashboard/analytics");
+  return { ok: true, data: { updated: r.updated } };
+}
+
+/** Replaces autopilot's posting times with the ones your own results point to. */
+export async function applyLearnedTimesAction(): Promise<ActionResult<{ slots: number }>> {
+  const userId = await userIdOrRedirect();
+  const settings = await getAutopilotSettings(userId);
+  const learned = learnBestTimes(await listMetricRows(userId, 60), settings.timezone);
+  if (!learned?.length) return { ok: false, error: "Not enough results yet to learn your best times" };
+  const slots = toSlots(learned);
+  const { enabled, timezone, accountIds, brandVoice, topics, requireApproval, horizonDays } = settings;
+  await saveAutopilotSettings(userId, { enabled, timezone, accountIds, brandVoice, topics, requireApproval, horizonDays, slots });
+  revalidatePath("/dashboard", "layout");
+  return { ok: true, data: { slots: slots.length } };
 }

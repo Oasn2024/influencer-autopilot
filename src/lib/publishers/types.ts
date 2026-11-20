@@ -1,3 +1,4 @@
+import type { TargetMetrics } from "@/db/schema";
 import type { PlatformId } from "@/lib/platforms";
 import type { PostContent } from "./validation";
 
@@ -16,6 +17,18 @@ export interface Publisher {
   publish(target: PublishTarget, accessToken: string, content: PostContent): Promise<PublishResult>;
   /** Returns fresh tokens. Only implemented where the platform supports refresh. */
   refresh?(tokens: { accessToken: string; refreshToken: string | null }): Promise<RefreshedTokens>;
+  /** Reads likes/comments/shares/views for a published post. Only where the platform's API allows it. */
+  metrics?(target: PublishTarget, accessToken: string, externalPostId: string): Promise<TargetMetrics>;
+}
+
+/** Keeps only finite, non-negative numbers. */
+export function cleanMetrics(m: Record<string, unknown>): TargetMetrics {
+  const out: TargetMetrics = {};
+  for (const k of ["likes", "comments", "shares", "views"] as const) {
+    const v = Number(m[k]);
+    if (m[k] !== undefined && m[k] !== null && Number.isFinite(v) && v >= 0) out[k] = Math.round(v);
+  }
+  return out;
 }
 
 /**
