@@ -1,19 +1,18 @@
 import { isVideoUrl } from "./validation";
-import { cleanMetrics, fetchRaw, PublishError, requestJson, withMediaLinks, type Publisher } from "./types";
+import { downloadMedia } from "./media";
+import { cleanMetrics, PublishError, requestJson, withMediaLinks, type Publisher } from "./types";
 
 const API = "https://api.x.com/2";
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 /** Uploads one image to X and returns its media id, or null if it can't be used natively. */
 async function uploadImage(url: string, accessToken: string): Promise<string | null> {
-  const res = await fetchRaw(url, { signal: AbortSignal.timeout(30_000) }).catch(() => null);
-  if (!res?.ok) return null;
-  const type = res.headers.get("content-type")?.split(";")[0] ?? "";
+  const media = await downloadMedia(url, { maxBytes: MAX_IMAGE_BYTES, platformName: "X" }).catch(() => null);
+  if (!media) return null;
+  const { type } = media;
   if (!/^image\/(jpeg|png|webp|gif)$/.test(type)) return null;
-  const bytes = await res.arrayBuffer();
-  if (bytes.byteLength > MAX_IMAGE_BYTES) return null;
   const form = new FormData();
-  form.set("media", new Blob([bytes], { type }), "image");
+  form.set("media", new Blob([media.bytes as BlobPart], { type }), "image");
   form.set("media_category", type === "image/gif" ? "tweet_gif" : "tweet_image");
   const { data } = await requestJson<{ data?: { id?: string } }>(`${API}/media/upload`, {
     platformName: "X",

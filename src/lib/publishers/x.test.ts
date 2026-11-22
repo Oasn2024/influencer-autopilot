@@ -1,10 +1,12 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { setMediaHostChecks } from "./media";
 import { PublishError, setFetch } from "./types";
 import { xPublisher } from "./x";
 
 const target = { externalAccountId: "1", handle: "me", metadata: {} };
 const respond = (status: number, body: unknown) => async () => new Response(JSON.stringify(body), { status });
 
+beforeAll(() => setMediaHostChecks(false));
 afterEach(() => setFetch((...args) => fetch(...args)));
 
 describe("xPublisher", () => {

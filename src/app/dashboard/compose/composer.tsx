@@ -187,7 +187,7 @@ export function Composer({ accounts, timeZone, imagesOn, uploadPrefix }: { accou
             id="media"
             rows={2}
             className={inputClass}
-            placeholder={imagesOn ? "Upload above, or paste public links (one per line). Instagram needs at least one." : "https://… one public link per line. Instagram needs at least one."}
+            placeholder={imagesOn ? "Upload above, or paste public links (one per line). Instagram needs at least one; YouTube and TikTok need one video (.mp4 or .mov)." : "https://… one public link per line. Instagram needs at least one; YouTube and TikTok need one video (.mp4 or .mov)."}
             value={media}
             onChange={(e) => setMedia(e.target.value)}
           />

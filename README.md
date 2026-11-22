@@ -128,8 +128,13 @@ Setup steps for each tool are on **Dashboard → AI agents**.
 ## Platform app setup
 
 Each platform needs a developer app; put its keys in the env vars listed in `.env.example` and register this redirect URI:
-`https://<your app>/api/connect/<provider>/callback` with provider `x`, `linkedin`, `threads` or `meta`.
+`https://<your app>/api/connect/<provider>/callback` with provider `x`, `linkedin`, `threads`, `meta`, `youtube` or `tiktok`.
 The Accounts page shows "Needs app keys" until a platform's keys are set.
+
+YouTube and TikTok take exactly one video per post (.mp4/.mov, up to `MAX_VIDEO_MB`, default 200). The publisher downloads it
+(public https hosts only, re-checked on every redirect) and uploads it: a resumable upload for YouTube (the title is the post's first line),
+and chunked `FILE_UPLOAD` Direct Post for TikTok. Unaudited apps on both platforms can only post privately; TikTok falls back to
+`SELF_ONLY` automatically. A YouTube upload costs 1,600 of the default 10,000 daily quota units, so about 6 uploads a day until Google raises it.
 
 Meta (Facebook + Instagram): in the app's Facebook Login settings turn on **Client OAuth login** and **Web OAuth login** and add the
 callback under **Valid OAuth Redirect URIs**. Apps created with "Facebook Login for Business" can set `META_CONFIG_ID` to a login

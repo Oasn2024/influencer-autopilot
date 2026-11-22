@@ -130,8 +130,8 @@ export default function Home() {
                 </div>
               </div>
               <div className="absolute -bottom-6 -left-4 -rotate-3 rounded-2xl border border-border bg-card px-4 py-3 text-sm shadow-xl">
-                <p className="font-semibold">✓ Published to 5 platforms</p>
-                <p className="text-xs text-muted">X, LinkedIn, Threads, Facebook, Instagram</p>
+                <p className="font-semibold">✓ Published to 7 platforms</p>
+                <p className="text-xs text-muted">X, LinkedIn, Threads, Facebook, Instagram, YouTube, TikTok</p>
               </div>
             </div>
           </div>

@@ -40,8 +40,8 @@ export const PLATFORMS: Record<PlatformId, PlatformInfo> = {
   x: { id: "x", name: "X", supports: ["text", "image", "video", "link"], maxTextLength: 280, developerPortal: "https://developer.x.com/en/portal/dashboard", available: true, color: "var(--foreground)" },
   pinterest: { id: "pinterest", name: "Pinterest", supports: ["image", "video", "link"], maxTextLength: 500, developerPortal: "https://developers.pinterest.com/apps/", available: false, color: "#E60023" },
   threads: { id: "threads", name: "Threads", supports: ["text", "image", "video", "link"], maxTextLength: 500, developerPortal: "https://developers.facebook.com/apps", available: true, color: "var(--foreground)" },
-  youtube: { id: "youtube", name: "YouTube", supports: ["video"], maxTextLength: 5000, developerPortal: "https://console.cloud.google.com/apis/credentials", available: false, color: "#FF0000" },
-  tiktok: { id: "tiktok", name: "TikTok", supports: ["video", "image"], maxTextLength: 2200, developerPortal: "https://developers.tiktok.com/apps", available: false, color: "#FE2C55" },
+  youtube: { id: "youtube", name: "YouTube", supports: ["video"], maxTextLength: 5000, developerPortal: "https://console.cloud.google.com/apis/credentials", available: true, color: "#FF0000" },
+  tiktok: { id: "tiktok", name: "TikTok", supports: ["video"], maxTextLength: 2200, developerPortal: "https://developers.tiktok.com/apps", available: true, color: "#FE2C55" },
   linkedin: { id: "linkedin", name: "LinkedIn", supports: ["text", "image", "video", "link"], maxTextLength: 3000, developerPortal: "https://www.linkedin.com/developers/apps", available: true, color: "#0A66C2" },
 };
 
