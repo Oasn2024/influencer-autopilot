@@ -6,8 +6,8 @@ import { PLATFORMS } from "@/lib/platforms";
 import { requireUserId } from "@/lib/users";
 import { DisconnectButton } from "./disconnect-button";
 
-export default async function AccountsPage({ searchParams }: { searchParams: Promise<{ error?: string; connected?: string }> }) {
-  const { error, connected } = await searchParams;
+export default async function AccountsPage({ searchParams }: { searchParams: Promise<{ error?: string; connected?: string; note?: string }> }) {
+  const { error, connected, note } = await searchParams;
   const userId = await requireUserId();
   if (!userId) redirect("/sign-in");
   const accounts = await listConnectedAccounts(userId);
@@ -21,6 +21,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
 
       {error && <p className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm">{error.slice(0, 200)}</p>}
       {connected && <p className="rounded-md bg-green-500/10 p-3 text-sm">Connected {Number(connected) || 1} account(s).</p>}
+      {note && <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">{note.slice(0, 240)}</p>}
 
       {accounts.length > 0 && (
         <ul className="divide-y divide-border rounded-xl border border-border">

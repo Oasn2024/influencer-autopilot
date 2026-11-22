@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { upsertConnectedAccount } from "@/lib/connected-accounts";
 import { OAUTH_COOKIE, appOrigin, redirectUriFor, resolveProvider } from "@/lib/oauth/flow";
+import { ConnectError } from "@/lib/oauth/providers";
+import { PublishError } from "@/lib/publishers/types";
 import { PLATFORMS } from "@/lib/platforms";
 import { logEvent } from "@/lib/publishing/events";
 import { requireUserId } from "@/lib/users";
@@ -25,7 +27,13 @@ export async function GET(req: Request, ctx: { params: Promise<{ platform: strin
   if (!provider) return fail("Unknown platform");
 
   const url = new URL(req.url);
-  if (url.searchParams.get("error")) return fail(`${provider.name} sign-in was canceled`);
+  const oauthError = url.searchParams.get("error");
+  if (oauthError) {
+    const reason = url.searchParams.get("error_reason") ?? oauthError;
+    if (/denied|cancel/i.test(reason)) return fail(`${provider.name} sign-in was canceled`);
+    const detail = (url.searchParams.get("error_description") ?? reason).replace(/[^\w .,:'()/-]/g, " ").slice(0, 160);
+    return fail(`${provider.name} refused the connection: ${detail}`);
+  }
   let saved: { state?: string; verifier?: string; provider?: string; userId?: string } = {};
   try {
     saved = JSON.parse((await cookies()).get(OAUTH_COOKIE)?.value ?? "{}");
@@ -55,11 +63,17 @@ export async function GET(req: Request, ctx: { params: Promise<{ platform: strin
       await logEvent({ userId, connectedAccountId: acct.id, type: "account.connected", message: `Connected ${PLATFORMS[p.platform].name}: ${p.displayName ?? p.handle ?? p.externalAccountId}` });
     }
     back.searchParams.set("connected", String(profiles.length));
+    if (provider.id === "meta" && !profiles.some((p) => p.platform === "instagram")) {
+      back.searchParams.set("note", "No Instagram account came with your Pages. To post to Instagram, make it a professional (Business or Creator) account, link it to your Facebook Page, then connect again.");
+    }
     const res = NextResponse.redirect(back);
     res.cookies.delete({ name: OAUTH_COOKIE, path: "/api/connect" });
     return res;
   } catch (err) {
     console.error("oauth exchange failed", provider.id, err instanceof Error ? err.message : err);
+    if (err instanceof ConnectError) return fail(err.message);
+    // Platform errors (bad redirect URI, app not live, missing permission) are worth showing as-is.
+    if (err instanceof PublishError) return fail(`${provider.name} connection failed: ${err.message.slice(0, 160)}`);
     return fail(`${provider.name} connection failed. Please try again.`);
   }
 }

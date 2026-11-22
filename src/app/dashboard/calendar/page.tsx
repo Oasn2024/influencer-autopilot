@@ -80,7 +80,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                     </span>
                   </span>
                   <span className="line-clamp-3">{p.body || "(media only)"}</span>
-                  <span className="text-muted">{statusLabel[p.status] ?? p.status}{p.source === "autopilot" ? " · autopilot" : ""}</span>
+                  <span className="text-muted">{statusLabel[p.status] ?? p.status}{p.source === "autopilot" ? " · autopilot" : p.source === "agent" ? " · your agent" : ""}</span>
                 </Link>
               ))}
               {list.length === 0 && empty.length > 0 && (

@@ -12,6 +12,7 @@ const links = [
   { href: "/dashboard/autopilot", label: "Autopilot", icon: "⟳" },
   { href: "/dashboard/monitor", label: "Monitor", icon: "◉" },
   { href: "/dashboard/accounts", label: "Accounts", icon: "⚭" },
+  { href: "/dashboard/agents", label: "AI agents", icon: "◈" },
   { href: "/dashboard/developers", label: "API", icon: "</>" },
 ] as const;
 

@@ -17,6 +17,9 @@ export type ConnectedProfile = {
   metadata?: Record<string, unknown>;
 };
 
+/** A connection problem with a message that's safe and useful to show the user. */
+export class ConnectError extends Error {}
+
 export type OAuthProviderId = "x" | "linkedin" | "threads" | "meta";
 
 export type OAuthProvider = {
@@ -213,6 +216,15 @@ type MetaPage = {
   instagram_business_account?: { id: string; username?: string; profile_picture_url?: string };
 };
 
+/** Explains why Meta gave us no Pages, from the permissions the person granted or declined. */
+export function metaNoPagesMessage(perms: { permission: string; status: string }[]): string {
+  const declined = perms.filter((p) => p.status !== "granted").map((p) => p.permission);
+  if (declined.includes("pages_show_list") || declined.includes("pages_manage_posts")) {
+    return "Facebook didn't share your Pages. Connect again, choose Edit settings, and allow access to your Page and its posts.";
+  }
+  return "No Facebook Pages came back. You need to be an admin of a Facebook Page, and pick it when Facebook asks which Pages to share. Instagram must be a professional account linked to that Page.";
+}
+
 const meta: OAuthProvider = {
   id: "meta",
   name: "Facebook & Instagram",
@@ -223,7 +235,8 @@ const meta: OAuthProvider = {
     `https://www.facebook.com/${graphVersion()}/dialog/oauth?${qs({
       client_id: env("META_APP_ID"),
       redirect_uri: redirectUri,
-      scope: META_SCOPES.join(","),
+      // Apps made with "Facebook Login for Business" use a configuration (set META_CONFIG_ID) instead of a scope list.
+      ...(env("META_CONFIG_ID") ? { config_id: env("META_CONFIG_ID"), override_default_response_type: "true" } : { scope: META_SCOPES.join(",") }),
       response_type: "code",
       state,
     })}`,
@@ -247,6 +260,13 @@ const meta: OAuthProvider = {
       g(`/me/accounts?fields=id,name,access_token,picture,instagram_business_account{id,username,profile_picture_url}&limit=100&access_token=${encodeURIComponent(long.access_token)}`),
       { platformName: "Facebook" },
     );
+    if (!pages.data?.length) {
+      const { data: perms } = await requestJson<{ data?: { permission: string; status: string }[] }>(
+        g(`/me/permissions?access_token=${encodeURIComponent(long.access_token)}`),
+        { platformName: "Facebook" },
+      ).catch(() => ({ data: { data: [] } }));
+      throw new ConnectError(metaNoPagesMessage(perms.data ?? []));
+    }
     const out: ConnectedProfile[] = [];
     for (const page of pages.data ?? []) {
       out.push({
