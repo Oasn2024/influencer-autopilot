@@ -21,7 +21,7 @@ export type CreatePostInput = {
   /** When to publish. Omit for a draft; a past/now time publishes on the next run. */
   scheduledAt?: Date | null;
   status?: "draft" | "pending_approval" | "scheduled";
-  source?: "manual" | "api" | "autopilot";
+  source?: "manual" | "api" | "autopilot" | "agent";
   generation?: Record<string, unknown> | null;
 };
 

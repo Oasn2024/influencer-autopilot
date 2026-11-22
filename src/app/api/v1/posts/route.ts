@@ -14,6 +14,8 @@ const createSchema = z.object({
   /** ISO time. Omit with `draft: true` to save without scheduling; omit otherwise to publish on the next run. */
   scheduled_at: z.iso.datetime({ offset: true }).optional(),
   draft: z.boolean().default(false),
+  /** Wait for the creator to approve it in the app before it's scheduled. */
+  require_approval: z.boolean().default(false),
 });
 
 /** GET /api/v1/posts?status=scheduled,failed&limit=50 */
@@ -38,7 +40,7 @@ export const POST = withApiUser(async (req, userId) => {
     accountIds: b.account_ids,
     overrides: b.overrides,
     scheduledAt: b.draft ? (b.scheduled_at ? new Date(b.scheduled_at) : null) : new Date(b.scheduled_at ?? Date.now()),
-    status: b.draft ? "draft" : "scheduled",
+    status: b.draft ? "draft" : b.require_approval ? "pending_approval" : "scheduled",
     source: "api",
   });
   return NextResponse.json({ data: serializePost(post) }, { status: 201 });

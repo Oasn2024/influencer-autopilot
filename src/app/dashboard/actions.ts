@@ -14,6 +14,7 @@ import { listConnectedAccounts } from "@/lib/connected-accounts";
 import { publishPostNow } from "@/lib/publishing/engine";
 import { cancelPost, createPost, PostValidationError, retryTarget, schedulePost } from "@/lib/publishing/posts";
 import { requireUserId } from "@/lib/users";
+import { createWebhook, deleteWebhook, sendTestWebhook, setWebhookEnabled, WEBHOOK_EVENT_IDS, WebhookError } from "@/lib/webhooks";
 
 async function userIdOrRedirect() {
   const userId = await requireUserId();
@@ -133,6 +134,7 @@ const autopilotSchema = z.object({
   topics: z.array(z.string().min(1).max(200)).max(30),
   requireApproval: z.boolean(),
   horizonDays: z.number().int().min(1).max(30),
+  writer: z.enum(["app", "agent"]).default("app"),
 });
 
 export async function saveAutopilotAction(input: z.input<typeof autopilotSchema>): Promise<ActionResult> {
@@ -149,7 +151,7 @@ export async function runAutopilotNowAction(): Promise<ActionResult<{ created: n
   const userId = await userIdOrRedirect();
   const settings = await getAutopilotSettings(userId);
   if (!settings.enabled) return { ok: false, error: "Turn autopilot on and save first" };
-  const result = await runAutopilotForUser(settings);
+  const result = await runAutopilotForUser(settings, new Date(), { force: true });
   revalidatePath("/dashboard", "layout");
   return { ok: true, data: { created: result.created, note: result.skipped } };
 }
@@ -158,6 +160,7 @@ export async function createApiKeyAction(name: string): Promise<ActionResult<{ k
   const userId = await userIdOrRedirect();
   const created = await createApiKey(userId, name);
   revalidatePath("/dashboard/developers");
+  revalidatePath("/dashboard/agents");
   return { ok: true, data: { key: created.key } };
 }
 
@@ -166,6 +169,7 @@ export async function revokeApiKeyAction(form: FormData) {
   const id = idFrom(form);
   if (id) await revokeApiKey(userId, id);
   revalidatePath("/dashboard/developers");
+  revalidatePath("/dashboard/agents");
 }
 
 export async function refreshStatsAction(): Promise<ActionResult<{ updated: number }>> {
@@ -182,8 +186,46 @@ export async function applyLearnedTimesAction(): Promise<ActionResult<{ slots: n
   const learned = learnBestTimes(await listMetricRows(userId, 60), settings.timezone);
   if (!learned?.length) return { ok: false, error: "Not enough results yet to learn your best times" };
   const slots = toSlots(learned);
-  const { enabled, timezone, accountIds, brandVoice, topics, requireApproval, horizonDays } = settings;
-  await saveAutopilotSettings(userId, { enabled, timezone, accountIds, brandVoice, topics, requireApproval, horizonDays, slots });
+  const { enabled, timezone, accountIds, brandVoice, topics, requireApproval, horizonDays, writer } = settings;
+  await saveAutopilotSettings(userId, { enabled, timezone, accountIds, brandVoice, topics, requireApproval, horizonDays, writer, slots });
   revalidatePath("/dashboard", "layout");
   return { ok: true, data: { slots: slots.length } };
+}
+
+const webhookSchema = z.object({ url: z.string().max(2000), events: z.array(z.enum(WEBHOOK_EVENT_IDS)).max(20) });
+
+export async function createWebhookAction(input: z.input<typeof webhookSchema>): Promise<ActionResult<{ secret: string }>> {
+  const userId = await userIdOrRedirect();
+  const parsed = webhookSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Check the URL and events" };
+  try {
+    const hook = await createWebhook(userId, parsed.data.url, parsed.data.events);
+    revalidatePath("/dashboard/agents");
+    return { ok: true, data: { secret: hook.secret } };
+  } catch (err) {
+    if (err instanceof WebhookError) return { ok: false, error: err.message };
+    throw err;
+  }
+}
+
+export async function deleteWebhookAction(form: FormData) {
+  const userId = await userIdOrRedirect();
+  const id = idFrom(form);
+  if (id) await deleteWebhook(userId, id);
+  revalidatePath("/dashboard/agents");
+}
+
+export async function toggleWebhookAction(form: FormData) {
+  const userId = await userIdOrRedirect();
+  const id = idFrom(form);
+  if (id) await setWebhookEnabled(userId, id, form.get("enabled") === "true");
+  revalidatePath("/dashboard/agents");
+}
+
+export async function testWebhookAction(id: string): Promise<ActionResult<{ status: number | null }>> {
+  const userId = await userIdOrRedirect();
+  if (!z.uuid().safeParse(id).success) return { ok: false, error: "Webhook not found" };
+  const r = await sendTestWebhook(userId, id);
+  revalidatePath("/dashboard/agents");
+  return r.ok ? { ok: true, data: { status: r.status } } : { ok: false, error: r.error ?? "Delivery failed" };
 }

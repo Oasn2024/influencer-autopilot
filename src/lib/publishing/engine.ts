@@ -9,7 +9,10 @@ import type { Publisher } from "@/lib/publishers/types";
 import { retryDelayMs, rollupPostStatus } from "@/lib/publishers/status";
 import { captionFor, validateForPlatform } from "@/lib/publishers/validation";
 import { PLATFORMS } from "@/lib/platforms";
+import { serializePost } from "@/lib/api/serialize";
+import { emitWebhookEvent } from "@/lib/webhooks";
 import { logEvent } from "./events";
+import { getPost } from "./posts";
 
 /**
  * Atomically claims due targets so overlapping cron runs never publish the same
@@ -85,6 +88,7 @@ async function publishTarget(targetId: string): Promise<TargetOutcome | null> {
     if (opts.auth) {
       await setAccountStatus(account.id, "expired", message);
       await logEvent({ ...base, level: "error", type: "account.expired", message: `${platformName} needs to be reconnected: ${message}` });
+      await emitWebhookEvent(post.userId, "account.expired", { account_id: account.id, platform: account.platform, name: account.displayName, error: message });
     }
     await logEvent({
       ...base,
@@ -161,6 +165,8 @@ export async function refreshPostStatus(postId: string) {
       message:
         status === "published" ? "Post is live on every account" : status === "partial" ? "Post went out on some accounts, not all" : "Post failed on every account",
     });
+    const full = await getPost(post.userId, postId);
+    if (full) await emitWebhookEvent(post.userId, `post.${status}`, serializePost(full));
   }
   return status;
 }

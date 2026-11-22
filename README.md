@@ -97,18 +97,43 @@ Create a key under **Dashboard → API**, then send `Authorization: Bearer iap_�
 | --- | --- | --- |
 | GET | `/api/v1/accounts` | Connected accounts |
 | GET | `/api/v1/posts?status=scheduled,failed&limit=50` | Posts with per-account results |
-| POST | `/api/v1/posts` | `{ body, media_urls?, account_ids, overrides?, scheduled_at?, draft? }` |
+| GET | `/api/v1/autopilot` | Open posting times, target accounts, brand voice and topics (for your own agent) |
+| POST | `/api/v1/posts` | `{ body, media_urls?, account_ids, overrides?, scheduled_at?, draft?, require_approval? }` |
 | GET | `/api/v1/posts/{id}` | One post |
+| POST | `/api/v1/posts/{id}/approve` | `{ scheduled_at? }`: put a draft or pending post on the schedule |
 | POST | `/api/v1/posts/{id}/publish` | Publish now |
 | DELETE | `/api/v1/posts/{id}` | Cancel |
 | POST | `/api/v1/drafts` | `{ topic, platforms, notes?, model?, tone?, goal?, count? (1-3), source_text? }` → `data` (first option) and `options` |
 | POST | `/api/v1/images` | `{ prompt, aspect? ("1:1", "4:5", "9:16", "16:9"), model? }` → `{ url, model }` (needs a Blob store) |
+
+An OpenAPI 3.1 description is public at `/api/v1/openapi.json` (import it into ChatGPT GPT Actions, n8n, Make or Postman).
+
+## Bring your own AI agent
+
+Creators who already use an AI agent can let it run their content instead of (or alongside) the app's own AI.
+Setup steps for each tool are on **Dashboard → AI agents**.
+
+- **MCP server** at `/api/mcp` (Streamable HTTP, stateless, JSON responses; protocol 2024-11-05 through 2025-11-25).
+  Auth is an `iap_` API key in `Authorization: Bearer`. Requests carrying an `Origin` other than the app's own are refused.
+  Tools live in `src/lib/agent/tools.ts`: `get_autopilot_brief`, `list_accounts`, `list_posts`, `get_post`, `create_post`,
+  `approve_post`, `publish_post_now`, `cancel_post`, `get_post_stats`, `write_with_app_ai`. Posts made by an agent have source `agent`,
+  and by default follow the creator's "approve each post" setting.
+- **Agent mode for autopilot** (`autopilot_settings.writer = 'agent'`): the cron run skips AI writing, works out the open slots,
+  and sends an `autopilot.slots_open` webhook when they change (or every 12 hours at most). The agent fills them with `create_post`.
+- **Webhooks** (`webhooks` table, up to 5 per user): signed JSON POSTs for `autopilot.slots_open`, `post.pending_approval`,
+  `post.published`, `post.partial`, `post.failed` and `account.expired`. Header `X-IAP-Signature: t=<unix>,v1=<hex>` is
+  HMAC-SHA256 of `"<t>.<body>"` with the webhook's secret (shown once, stored encrypted). Only public `https` URLs are allowed;
+  host names are resolved and private addresses refused, redirects aren't followed, and a webhook switches off after 25 failures in a row.
 
 ## Platform app setup
 
 Each platform needs a developer app; put its keys in the env vars listed in `.env.example` and register this redirect URI:
 `https://<your app>/api/connect/<provider>/callback` with provider `x`, `linkedin`, `threads` or `meta`.
 The Accounts page shows "Needs app keys" until a platform's keys are set.
+
+Meta (Facebook + Instagram): in the app's Facebook Login settings turn on **Client OAuth login** and **Web OAuth login** and add the
+callback under **Valid OAuth Redirect URIs**. Apps created with "Facebook Login for Business" can set `META_CONFIG_ID` to a login
+configuration id; the app then sends `config_id` instead of a scope list.
 
 ## Getting started
 

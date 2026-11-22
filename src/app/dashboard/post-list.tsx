@@ -11,7 +11,7 @@ export function PostList({ posts, timeZone, empty }: { posts: PostWithTargets[];
         <li key={p.id} className="rounded-xl border border-border p-4">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Badge status={p.status} />
-            {p.source !== "manual" && <span className="text-xs text-muted">via {p.source === "autopilot" ? "autopilot" : "API"}</span>}
+            {p.source !== "manual" && <span className="text-xs text-muted">via {p.source === "autopilot" ? "autopilot" : p.source === "agent" ? "your AI agent" : "API"}</span>}
             <span className="text-muted">{formatWhen(p.publishedAt ?? p.scheduledAt, timeZone)}</span>
           </div>
           <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm">{p.body || <em className="text-muted">(media only)</em>}</p>

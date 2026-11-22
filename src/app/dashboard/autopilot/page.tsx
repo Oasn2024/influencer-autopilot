@@ -13,8 +13,8 @@ export default async function AutopilotPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Autopilot">
-        Pick your weekly posting times and topics. Autopilot keeps the next {settings.horizonDays} days filled with AI drafts in your voice and
-        publishes them on time. Last run: {settings.lastRunAt ? formatWhen(settings.lastRunAt, settings.timezone) : "never"}.
+        Pick your weekly posting times and topics. Autopilot keeps the next {settings.horizonDays} days filled with{" "}
+        {settings.writer === "agent" ? "posts from your own AI agent" : "AI drafts in your voice"} and publishes them on time. Last run: {settings.lastRunAt ? formatWhen(settings.lastRunAt, settings.timezone) : "never"}.
       </PageHeader>
       <AutopilotForm
         initial={{
@@ -26,6 +26,7 @@ export default async function AutopilotPage() {
           topics: settings.topics,
           requireApproval: settings.requireApproval,
           horizonDays: settings.horizonDays,
+          writer: settings.writer,
         }}
         accounts={accounts.map((a) => ({
           id: a.id,

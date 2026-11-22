@@ -13,7 +13,9 @@ export const postStatusEnum = pgEnum("post_status", [
   "failed",
   "canceled",
 ]);
-export const postSourceEnum = pgEnum("post_source", ["manual", "api", "autopilot"]);
+export const postSourceEnum = pgEnum("post_source", ["manual", "api", "autopilot", "agent"]);
+/** Who writes autopilot posts: this app's AI, or the user's own AI agent (via MCP, the API or webhooks). */
+export const autopilotWriterEnum = pgEnum("autopilot_writer", ["app", "agent"]);
 export const eventLevelEnum = pgEnum("event_level", ["info", "warning", "error"]);
 export const targetStatusEnum = pgEnum("target_status", ["pending", "publishing", "published", "failed", "skipped"]);
 
@@ -128,6 +130,10 @@ export const autopilotSettings = pgTable("autopilot_settings", {
   requireApproval: boolean("require_approval").notNull().default(true),
   /** How many days ahead autopilot keeps filled. */
   horizonDays: integer("horizon_days").notNull().default(7),
+  writer: autopilotWriterEnum("writer").notNull().default("app"),
+  /** Agent mode: the open slots we last told the user's agent about, so we don't repeat ourselves every run. */
+  agentNotifiedKey: text("agent_notified_key"),
+  agentNotifiedAt: timestamp("agent_notified_at", { withTimezone: true }),
   lastRunAt: timestamp("last_run_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -166,11 +172,35 @@ export const apiKeys = pgTable(
   (t) => [uniqueIndex("api_keys_hash_idx").on(t.keyHash), index("api_keys_user_idx").on(t.userId)],
 );
 
+/**
+ * Outgoing webhooks: we POST signed JSON to the user's own tools (their AI agent, Zapier, n8n...)
+ * when things happen. The signing secret is stored encrypted, like platform tokens.
+ */
+export const webhooks = pgTable(
+  "webhooks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    /** Event types to send; empty means all. */
+    events: text("events").array().notNull().default([]),
+    secretEnc: text("secret_enc").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    failureCount: integer("failure_count").notNull().default(0),
+    lastStatus: integer("last_status"),
+    lastError: text("last_error"),
+    lastDeliveredAt: timestamp("last_delivered_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("webhooks_user_idx").on(t.userId)],
+);
+
 export type User = typeof users.$inferSelect;
 export type ConnectedAccount = typeof connectedAccounts.$inferSelect;
 export type Post = typeof posts.$inferSelect;
 export type PostTarget = typeof postTargets.$inferSelect;
 export type AutopilotSettings = typeof autopilotSettings.$inferSelect;
 export type ActivityEvent = typeof activityEvents.$inferSelect;
+export type Webhook = typeof webhooks.$inferSelect;
 export type PostStatus = (typeof postStatusEnum.enumValues)[number];
 export type TargetStatus = (typeof targetStatusEnum.enumValues)[number];

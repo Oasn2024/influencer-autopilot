@@ -19,6 +19,7 @@ type Settings = {
   topics: string[];
   requireApproval: boolean;
   horizonDays: number;
+  writer: "app" | "agent";
 };
 
 type Account = { id: string; label: string; platform: PlatformId; textCapable: boolean; active: boolean };
@@ -55,7 +56,8 @@ export function AutopilotForm({ initial, accounts }: { initial: Settings; accoun
       const res = await runAutopilotNowAction();
       if (!res.ok) return setMessage({ ok: false, text: res.error });
       const { created, note } = res.data!;
-      setMessage({ ok: true, text: created ? `Drafted ${created} post(s). See Posts.` : `Nothing new to draft${note ? ` (${note})` : ": upcoming slots are already filled"}.` });
+      if (initial.writer === "agent") setMessage({ ok: true, text: note ? `Nothing sent (${note}).` : "Done. Your agent can see your open times now, and any webhooks were sent." });
+      else setMessage({ ok: true, text: created ? `Drafted ${created} post(s). See Posts.` : `Nothing new to draft${note ? ` (${note})` : ": upcoming slots are already filled"}.` });
       router.refresh();
     });
 
@@ -68,6 +70,31 @@ export function AutopilotForm({ initial, accounts }: { initial: Settings; accoun
           <span className="block text-sm text-muted">Runs every few minutes: publishes what&apos;s due and drafts posts for empty slots.</span>
         </span>
       </label>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="font-semibold">Who writes the posts</h2>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {(
+            [
+              ["app", "This app's AI", "Autopilot writes drafts in your voice for each open time."],
+              ["agent", "My own AI agent", "Claude, ChatGPT, Cursor or your own workflow writes them. Autopilot keeps the schedule and publishes."],
+            ] as const
+          ).map(([value, title, note]) => (
+            <label key={value} className={`flex cursor-pointer gap-3 rounded-xl border p-3 text-sm ${s.writer === value ? "border-accent bg-card" : "border-border"}`}>
+              <input type="radio" name="writer" className="mt-1 accent-[var(--accent)]" checked={s.writer === value} onChange={() => set("writer", value)} />
+              <span>
+                <span className="font-medium">{title}</span>
+                <span className="block text-muted">{note}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        {s.writer === "agent" && (
+          <p className="text-xs text-muted">
+            Set up your agent on the <a href="/dashboard/agents" className="text-accent underline">AI agents</a> page. Your voice, topics and approval setting below are shared with it.
+          </p>
+        )}
+      </section>
 
       <section className="flex flex-col gap-2">
         <h2 className="font-semibold">Posting times</h2>
@@ -124,7 +151,11 @@ export function AutopilotForm({ initial, accounts }: { initial: Settings; accoun
             />
             {a.label}
             {!a.active && <span className="text-xs text-amber-600">needs reconnecting</span>}
-            {!a.textCapable && <span className="text-xs text-muted">(needs media, so autopilot skips it; post to it from Compose)</span>}
+            {!a.textCapable && (
+              <span className="text-xs text-muted">
+                {s.writer === "agent" ? "(needs an image or video: your agent must include one)" : "(needs media, so autopilot skips it; post to it from Compose)"}
+              </span>
+            )}
           </label>
         ))}
       </section>
@@ -145,7 +176,7 @@ export function AutopilotForm({ initial, accounts }: { initial: Settings; accoun
       <section className="flex flex-col gap-2">
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" className="accent-[var(--accent)]" checked={s.requireApproval} onChange={(e) => set("requireApproval", e.target.checked)} />
-          Ask me to approve each AI draft before it&apos;s scheduled (recommended)
+          Ask me to approve each {s.writer === "agent" ? "post from my agent" : "AI draft"} before it&apos;s scheduled (recommended)
         </label>
         <label className="flex items-center gap-2 text-sm">
           Keep the next
@@ -158,7 +189,9 @@ export function AutopilotForm({ initial, accounts }: { initial: Settings; accoun
 
       <div className="flex flex-wrap gap-3 border-t border-border pt-4">
         <button type="button" className={primaryButtonClass} disabled={pending} onClick={save}>{pending ? "Working…" : "Save"}</button>
-        <button type="button" className={buttonClass} disabled={pending || !initial.enabled} onClick={runNow}>Draft upcoming posts now</button>
+        <button type="button" className={buttonClass} disabled={pending || !initial.enabled} onClick={runNow}>
+          {initial.writer === "agent" ? "Tell my agent about open times now" : "Draft upcoming posts now"}
+        </button>
       </div>
     </div>
   );
