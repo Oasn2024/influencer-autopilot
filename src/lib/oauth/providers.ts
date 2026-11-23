@@ -20,7 +20,7 @@ export type ConnectedProfile = {
 /** A connection problem with a message that's safe and useful to show the user. */
 export class ConnectError extends Error {}
 
-export type OAuthProviderId = "x" | "linkedin" | "threads" | "meta";
+export type OAuthProviderId = "x" | "linkedin" | "threads" | "meta" | "youtube" | "tiktok";
 
 export type OAuthProvider = {
   id: OAuthProviderId;
@@ -39,6 +39,8 @@ const qs = (params: Record<string, string>) => new URLSearchParams(params).toStr
 const X_SCOPES = ["tweet.read", "tweet.write", "users.read", "media.write", "offline.access"];
 const LINKEDIN_SCOPES = ["openid", "profile", "w_member_social"];
 const THREADS_SCOPES = ["threads_basic", "threads_content_publish", "threads_manage_insights"];
+const YOUTUBE_SCOPES = ["https://www.googleapis.com/auth/youtube.upload", "https://www.googleapis.com/auth/youtube.readonly"];
+const TIKTOK_SCOPES = ["user.info.basic", "video.publish", "video.list"];
 const META_SCOPES = [
   "pages_show_list",
   "pages_read_engagement",
@@ -297,7 +299,124 @@ const meta: OAuthProvider = {
   },
 };
 
-export const OAUTH_PROVIDERS: Record<OAuthProviderId, OAuthProvider> = { x, linkedin, threads, meta };
+const youtube: OAuthProvider = {
+  id: "youtube",
+  name: "YouTube",
+  platforms: ["youtube"],
+  envVars: ["YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET"],
+  usesPkce: true,
+  authorizeUrl: ({ redirectUri, state, codeChallenge }) =>
+    `https://accounts.google.com/o/oauth2/v2/auth?${qs({
+      client_id: env("YOUTUBE_CLIENT_ID"),
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: YOUTUBE_SCOPES.join(" "),
+      // offline + consent makes Google return a refresh token every time, so uploads keep working.
+      access_type: "offline",
+      prompt: "consent",
+      include_granted_scopes: "true",
+      state,
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256",
+    })}`,
+  async exchange({ code, redirectUri, codeVerifier }) {
+    const { data: tok } = await requestJson<{ access_token: string; refresh_token?: string; expires_in?: number; scope?: string }>(
+      "https://oauth2.googleapis.com/token",
+      {
+        platformName: "YouTube",
+        method: "POST",
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code,
+          redirect_uri: redirectUri,
+          client_id: env("YOUTUBE_CLIENT_ID"),
+          client_secret: env("YOUTUBE_CLIENT_SECRET"),
+          code_verifier: codeVerifier,
+        }),
+      },
+    );
+    const scopes = tok.scope?.split(" ") ?? YOUTUBE_SCOPES;
+    if (!scopes.includes(YOUTUBE_SCOPES[0])) throw new ConnectError("YouTube didn't give permission to upload videos. Connect again and tick every box Google shows.");
+    type Channel = { id: string; snippet?: { title?: string; customUrl?: string; thumbnails?: { default?: { url?: string } } } };
+    const { data: ch } = await requestJson<{ items?: Channel[] }>("https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true", {
+      platformName: "YouTube",
+      headers: { Authorization: `Bearer ${tok.access_token}` },
+    });
+    if (!ch.items?.length) throw new ConnectError("That Google account has no YouTube channel yet. Create one at youtube.com, then connect again.");
+    return ch.items.map((c) => ({
+      platform: "youtube" as const,
+      externalAccountId: c.id,
+      displayName: c.snippet?.title ?? null,
+      handle: c.snippet?.customUrl ?? null,
+      avatarUrl: c.snippet?.thumbnails?.default?.url ?? null,
+      accessToken: tok.access_token,
+      refreshToken: tok.refresh_token ?? null,
+      expiresAt: expiry(tok.expires_in),
+      scopes,
+    }));
+  },
+};
+
+const tiktok: OAuthProvider = {
+  id: "tiktok",
+  name: "TikTok",
+  platforms: ["tiktok"],
+  envVars: ["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET"],
+  usesPkce: false,
+  authorizeUrl: ({ redirectUri, state }) =>
+    `https://www.tiktok.com/v2/auth/authorize/?${qs({
+      client_key: env("TIKTOK_CLIENT_KEY"),
+      response_type: "code",
+      scope: TIKTOK_SCOPES.join(","),
+      redirect_uri: redirectUri,
+      state,
+    })}`,
+  async exchange({ code, redirectUri }) {
+    const { data: tok } = await requestJson<{
+      access_token?: string;
+      refresh_token?: string;
+      expires_in?: number;
+      open_id?: string;
+      scope?: string;
+      error?: string;
+      error_description?: string;
+    }>("https://open.tiktokapis.com/v2/oauth/token/", {
+      platformName: "TikTok",
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_key: env("TIKTOK_CLIENT_KEY"),
+        client_secret: env("TIKTOK_CLIENT_SECRET"),
+        code,
+        grant_type: "authorization_code",
+        redirect_uri: redirectUri,
+      }),
+    });
+    if (!tok.access_token || !tok.open_id) throw new ConnectError(`TikTok sign-in failed: ${tok.error_description ?? tok.error ?? "no token returned"}`);
+    const scopes = tok.scope?.split(",") ?? TIKTOK_SCOPES;
+    if (!scopes.includes("video.publish")) throw new ConnectError("TikTok didn't give permission to post videos. Connect again and allow posting.");
+    const { data: me } = await requestJson<{ data?: { user?: { open_id?: string; display_name?: string; username?: string; avatar_url?: string } } }>(
+      "https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,username,avatar_url",
+      { platformName: "TikTok", headers: { Authorization: `Bearer ${tok.access_token}` } },
+    ).catch(() => ({ data: {} as { data?: { user?: Record<string, string> } } }));
+    const user = me.data?.user ?? {};
+    return [
+      {
+        platform: "tiktok",
+        externalAccountId: tok.open_id,
+        displayName: user.display_name ?? user.username ?? null,
+        handle: user.username ? `@${user.username}` : null,
+        avatarUrl: user.avatar_url ?? null,
+        accessToken: tok.access_token,
+        refreshToken: tok.refresh_token ?? null,
+        expiresAt: expiry(tok.expires_in),
+        scopes,
+      },
+    ];
+  },
+};
+
+export const OAUTH_PROVIDERS: Record<OAuthProviderId, OAuthProvider> = { x, linkedin, threads, meta, youtube, tiktok };
 
 /** Which OAuth app connects a platform. */
 export function providerForPlatform(platform: PlatformId): OAuthProvider | undefined {

@@ -85,7 +85,7 @@ export const AGENT_TOOLS: AgentTool[] = [
     name: "create_post",
     title: "Create a post",
     description:
-      "Writes a post to one or more accounts. Leave scheduled_at out to use the next open autopilot time. mode 'approval' (the default when the creator asked to approve posts) waits for their OK in the app; 'schedule' posts at the time without asking; 'draft' just saves it. Instagram needs at least one public image or video URL in media_urls.",
+      "Writes a post to one or more accounts. Leave scheduled_at out to use the next open autopilot time. mode 'approval' (the default when the creator asked to approve posts) waits for their OK in the app; 'schedule' posts at the time without asking; 'draft' just saves it. Instagram needs at least one public image or video URL in media_urls; YouTube and TikTok need exactly one video URL (.mp4 or .mov).",
     input: z.object({
       body: z.string().max(70000).describe("The post text"),
       account_ids: z.array(z.uuid()).min(1).max(50).describe("Account ids from list_accounts or get_autopilot_brief"),

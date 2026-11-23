@@ -33,6 +33,7 @@ export function validateForPlatform(platform: PlatformId, content: PostContent):
   if (videos.length && !info.supports.includes("video")) push(`${info.name} doesn't accept video here`);
   if (images.length && !info.supports.includes("image")) push(`${info.name} doesn't accept images here`);
   if (platform === "youtube" && videos.length !== 1) push("YouTube needs exactly one video");
+  if (platform === "tiktok" && videos.length !== 1) push("TikTok needs exactly one video");
   if (platform === "instagram" && content.mediaUrls.length > 10) push("Instagram allows up to 10 media items");
   if (platform === "x" && content.mediaUrls.length > 4) push("X allows up to 4 media items");
   return issues;

@@ -8,7 +8,7 @@ import type { PlatformId } from "@/lib/platforms";
 import type { MetricRow } from "./insights";
 
 /** Platforms whose API lets us read post engagement with the permissions we ask for. */
-export const METRICS_PLATFORMS: PlatformId[] = ["x", "threads", "facebook", "instagram"];
+export const METRICS_PLATFORMS: PlatformId[] = ["x", "threads", "facebook", "instagram", "youtube", "tiktok"];
 
 /**
  * Reads fresh engagement numbers for recently published posts. New posts (under 2 days)
